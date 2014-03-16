@@ -1,0 +1,293 @@
+<?php session_start(); ?>
+<!DOCTYPE xhtml PUBLIC "-//W3C//DTD XHTML 4.01//EN">
+<html>
+<head>
+<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+<meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+<title>Where Am I?</title>
+
+<script type="text/javascript" src="http://code.jquery.com/jquery-1.4.2.min.js"></script>
+<!--<script type="text/javascript" src="http://google-maps-utility-library-v3.googlecode.com/svn/trunk/markerclusterer/src/markerclusterer.js"></script>-->
+<script type="text/javascript"
+  src="http://maps.google.com/maps/api/js?sensor=true"></script>
+<script type="text/javascript" src="geometa.js"></script>
+<script type="text/javascript" src="util.js"></script>
+<style type="text/css">
+  *, html { margin:0; padding:0 }
+  div#map_canvas { width:100%; height:100%; }
+  div#info { width:100%; position:absolute; overflow:hidden; text-align:center; top:0;
+    left:0; }
+  .lightBox {
+    filter:alpha(opacity=60);
+    -moz-opacity:0.6;
+    -khtml-opacity: 0.6;
+    opacity: 0.6;
+    background-color:white;
+    padding:2px;
+  }
+   div#info2 .lightBox2 {
+    padding:2px;
+	    filter:alpha(opacity=100);
+    -moz-opacity:1;
+    -khtml-opacity: 1;
+    opacity: 1;
+    background-color:black;
+    padding:2px;
+  }
+</style>
+<script type="text/javascript">
+var infowindow = new google.maps.InfoWindow(
+  { 
+    size: new google.maps.Size(150,50)
+  });
+
+  var map;
+  useremail = '';
+  function initialise() {
+    var latlng = new google.maps.LatLng(49	,2);
+    var myOptions = {
+      zoom: 7,
+      center: latlng,
+      mapTypeId: google.maps.MapTypeId.ROADMAP,
+      disableDefaultUI: false
+    }
+    map = new google.maps.Map(document.getElementById("map_canvas"), myOptions);
+	eviction_list = [];
+	windows = [];
+	loadMarkers();
+
+  }
+  
+  function evictMarkers() {
+    // clear all markers
+    $(eviction_list).each(function () {
+         this.setMap(null);
+    });
+    // reset the eviction array 
+    eviction_list = [];
+
+}
+ 
+ function createMarker(latlng, name, html) {
+    var contentString = html;
+    var marker = new google.maps.Marker({
+        position: latlng,
+        map: map
+        });
+
+    google.maps.event.addListener(marker, 'click', function() {
+        infowindow.setContent(contentString); 
+        infowindow.open(map,marker);
+        });
+    // save the info we need to use later for the side_bar
+    eviction_list.push(marker);
+}
+ 
+function loadMarkers() {
+
+// Download positions
+downloadUrl("get.php", function(data) {
+
+      var markers = data.documentElement.getElementsByTagName("marker");
+	  evictMarkers();
+      for (var i = 0; i < markers.length; i++) {
+	  var latlng = new google.maps.LatLng(parseFloat(markers[i].getAttribute("lat")),
+                                    parseFloat(markers[i].getAttribute("lng")));
+		var titre = markers[i].getAttribute("user");							
+	// Function : position, titre
+	
+	var marker = createMarker(latlng, titre, titre + ' ' + latlng); 
+   //     var marker = new google.maps.Marker({position: latlng, map: map, name: markers[i].getAttribute("title"),clickable: true});
+	//	
+	//	var titre = markers[i].getAttribute("title");
+	//	marker.titre = titre;
+	////	google.maps.event.addListener(marker, "click", function() {
+   // //  if (infowindow) infowindow.close();
+   // //  infowindow = new google.maps.InfoWindow({content: name});
+   // //  infowindow.open(map, marker);
+   // //});
+	//	
+	//	eviction_list[i] = marker;
+	//
+	//	windows[i] = new google.maps.InfoWindow({
+   //             content: marker.titre
+   //         });
+   //
+   //         google.maps.event.addListener(eviction_list[i], 'click', function () {
+   //             windows[i].open(map, eviction_list[i]);
+   //         });
+	
+       }
+     });
+	 
+	 //Refresh every 5 seconds :
+	 setTimeout(loadMarkers, 30000);
+ } 
+
+  function doGeolocation() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(positionSuccess, positionError);
+    } else {
+      positionError(-1);
+    }
+  }
+
+  function positionError(err) {
+    var msg;
+    switch(err.code) {
+      case err.UNKNOWN_ERROR:
+        msg = "Unable to find your location";
+        break;
+      case err.PERMISSION_DENINED:
+        msg = "Permission denied in finding your location";
+        break;
+      case err.POSITION_UNAVAILABLE:
+        msg = "Your location is currently unknown";
+        break;
+      case err.BREAK:
+        msg = "Attempt to find location took too long";
+        break;
+      default:
+        msg = "Location detection not supported in browser";
+    }
+	
+
+    document.getElementById('texte').innerHTML = msg;
+  }
+
+  function positionSuccess(position) {
+    // Centre the map on the new location
+    var coords = position.coords || position.coordinate || position;
+    var latLng = new google.maps.LatLng(coords.latitude, coords.longitude);
+	
+					var dataString = 'user=' + document.getElementById('email').innerHTML + '&lat=' + coords.latitude + '&long=' + coords.longitude
+	                $.ajax({
+                         type: "POST",
+                         url: "add.php",
+                         data: dataString
+                    });
+	
+    map.setCenter(latLng);
+    map.setZoom(12);
+    var marker = new google.maps.Marker({
+	    map: map,
+	    position: latLng,
+	    title: 'Why, there you are!'
+    });
+    document.getElementById('texte').innerHTML = 'Looking for <b>' +
+        coords.latitude + ', ' + coords.longitude + '</b>...';
+
+    // And reverse geocode.
+    (new google.maps.Geocoder()).geocode({latLng: latLng}, function(resp) {
+		  var place = "You're around here somewhere!";
+		  if (resp[0]) {
+			  var bits = [];
+			  for (var i = 0, I = resp[0].address_components.length; i < I; ++i) {
+				  var component = resp[0].address_components[i];
+				  if (contains(component.types, 'political')) {
+					  bits.push('<b>' + component.long_name + '</b>');
+					}
+				}
+				if (bits.length) {
+					place = bits.join(' > ');
+				}
+				marker.setTitle(resp[0].formatted_address);
+			}
+			document.getElementById('texte').innerHTML = place + ' <input id="clickMe" type="button" value="Refresh my position" onclick=" doGeolocation();" />' ;
+	  });
+  }
+
+  function contains(array, item) {
+	  for (var i = 0, I = array.length; i < I; ++i) {
+		  if (array[i] == item) return true;
+		}
+		return false;
+	}
+
+
+  /*
+   * Triggered when the user accepts the the sign in, cancels, or closes the
+   * authorization dialog.
+   */
+  function loginFinishedCallback(authResult) {
+    if (authResult) {
+      if (authResult['error'] == undefined){
+        gapi.auth.setToken(authResult); // Store the returned token.
+        toggleElement('signin-button'); // Hide the sign-in button after successfully signing in the user.
+        getEmail();                     // Trigger request to get the email address.
+
+      } else {
+        console.log('An error occurred');
+      }
+    } else {
+      console.log('Empty authResult');  // Something went wrong
+    }
+  }
+
+  /*
+   * Initiates the request to the userinfo endpoint to get the user's email
+   * address. This function relies on the gapi.auth.setToken containing a valid
+   * OAuth access token.
+   *
+   * When the request completes, the getEmailCallback is triggered and passed
+   * the result of the request.
+   */
+  function getEmail(){
+    // Load the oauth2 libraries to enable the userinfo methods.
+    gapi.client.load('oauth2', 'v2', function() {
+          var request = gapi.client.oauth2.userinfo.get();
+          request.execute(getEmailCallback);
+        });
+  }
+
+  function getEmailCallback(obj){
+    var el = document.getElementById('email');
+    var email = '';
+    
+    if (obj['email']) {
+      email = obj['email'];
+		useremail = email;
+	}
+
+    console.log(obj);   // Uncomment to inspect the full object.
+
+    el.innerHTML = email;
+    toggleElement('email');
+		prepareGeolocation();
+    doGeolocation();
+  }
+
+  function toggleElement(id) {
+    var el = document.getElementById(id);
+    if (el.getAttribute('class') == 'hide') {
+      el.setAttribute('class', 'show');
+    } else {
+      el.setAttribute('class', 'hide');
+    }
+  }
+  </script>
+
+  <style type="text/css">
+  .hide { display: none;}
+  .show { display: block;}
+  </style>
+  <script src="https://apis.google.com/js/plusone.js" type="text/javascript"></script>
+  
+</head>
+<body onload="initialise()">
+  <div id="map_canvas"></div>
+  <div id="info" class="lightbox"><div id="texte">Log in to sync your location...</div><div id="email" class="hide"></div>
+  <div id="signin-button" class="show">
+     <div class="g-signin" data-callback="loginFinishedCallback"
+      data-clientid="162643658826.apps.googleusercontent.com"
+      data-scope="https://www.googleapis.com/auth/plus.login https://www.googleapis.com/auth/userinfo.email"
+      data-height="short"
+      data-cookiepolicy="single_host_origin"
+      >
+    </div></div>
+	<div id="info2" class="lightbox2" align="right">
+	<input id="clickMe" type="image" style="height:40px;width:40px;" src="./refresh.png" onclick=" doGeolocation();" />
+	<input id="clickMe" type="image" style="height:40px;width:40px;" src="./Centermap.png" onclick=" doGeolocation();" />
+	</div></div>
+</body>
+</html>
