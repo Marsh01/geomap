@@ -217,3 +217,17 @@ navigator.geolocation = (window.google && google.gears && google.gears.factory.c
 
 })();
 }
+
+androidlogin = function ()
+{
+window.plugins.googleplus.login(
+    {
+   },
+    function (obj) {
+      alert(JSON.stringify(obj)); // do something useful instead of alerting
+    },
+    function (msg) {
+      alert('error: ' + msg);
+    }
+);
+}
